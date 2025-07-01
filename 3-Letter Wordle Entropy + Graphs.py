@@ -6,7 +6,7 @@ from collections import Counter, defaultdict
 # --- 1. Word list ---
 TARGETS = ['cat', 'dog', 'pig', 'cow', 'bug', 'sun', 'fun', 'run', 'pan', 'man']
 GUESSES = TARGETS.copy()
-
+#test
 # --- 2. Feedback function (green=2, yellow=1, gray=0) ---
 def score_feedback(guess, target):
     fb = [0]*3
