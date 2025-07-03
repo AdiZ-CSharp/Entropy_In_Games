@@ -126,6 +126,7 @@ if __name__ == "__main__":
 
     xdata, ydata = [], []
 
+    """
     def init():
         line.set_data([], [])
         return line,
@@ -140,7 +141,32 @@ if __name__ == "__main__":
         fig1, update, frames=len(avg_entropy_by_turn),
         init_func=init, blit=True, interval=700, repeat=False
     )
+    """
 
+    lines = []
+    avg_line, = ax1.plot([], [], lw=3, color='blue', label='Average Entropy')
+
+    def init():
+        return lines + [avg_line]
+
+    def update(frame):
+        if frame < len(entropy_logs):
+            trace = entropy_logs[frame]
+            x = list(range(1, len(trace)+1))
+            y = trace
+            line, = ax1.plot(x, y, color='gray', alpha=0.2)
+            lines.append(line)
+        x_avg = list(range(1, len(avg_entropy_by_turn)+1))
+        y_avg = avg_entropy_by_turn
+        avg_line.set_data(x_avg, y_avg)
+        return lines + [avg_line]
+
+    ani = animation.FuncAnimation(
+        fig1, update, frames=len(entropy_logs),
+        init_func=init, blit=True, interval=10, repeat=False
+    )
+
+    
     # --- 7b. Plot all entropy traces for all games ---
     fig2, ax2 = plt.subplots(figsize=(8,5))
     for trace in entropy_logs:
