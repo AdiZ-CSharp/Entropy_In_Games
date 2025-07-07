@@ -3,12 +3,13 @@ import math
 import itertools
 import matplotlib.pyplot as plt
 import numpy as np
+import time
 
 # --- Config ---
 GRID_SIZE = 6
 SHIP_SIZES = [3, 2]
 NUM_GAMES = 500
-NUM_MOVES = 15  # Number of moves to simulate per game
+MAX_MOVES = 50  # Safety cap, but most games will end sooner
 
 # --- Board Representation ---
 def empty_board():
@@ -103,8 +104,8 @@ def simulate_entropy_trace():
     all_moves = [(r, c) for r in range(GRID_SIZE) for c in range(GRID_SIZE)]
     random.shuffle(all_moves)
     entropies = []
-
-    for move in all_moves[:NUM_MOVES]:
+    ship_cells = set(cell for ship in ships for cell in ship)
+    for move_num, move in enumerate(all_moves):
         r, c = move
         if board[r][c] == 1:
             hits.add((r, c))
@@ -112,30 +113,53 @@ def simulate_entropy_trace():
             misses.add((r, c))
         ent = board_entropy(hits, misses)
         entropies.append(ent)
+        # If all ship cells have been hit, entropy is zero, game is solved
+        if ship_cells.issubset(hits):
+            break
+        if move_num + 1 >= MAX_MOVES:
+            break
     return entropies
+
+start_time = time.time()
 
 # --- Run Simulations ---
 all_entropy_traces = []
+max_length = 0
 for _ in range(NUM_GAMES):
     trace = simulate_entropy_trace()
     all_entropy_traces.append(trace)
+    if len(trace) > max_length:
+        max_length = len(trace)
 
-# Pad shorter games with last entropy value
-max_length = max(len(trace) for trace in all_entropy_traces)
+# Pad shorter games with zeros (entropy is zero after solved)
 for trace in all_entropy_traces:
-    while len(trace) < max_length:
-        trace.append(trace[-1])
+    if len(trace) < max_length:
+        last_val = trace[-1] if trace else 0.0
+        # If last entropy is not zero, pad with zeros (game solved)
+        pad_val = 0.0
+        trace.extend([pad_val] * (max_length - len(trace)))
 
 # Average entropy per move
 avg_entropy = np.mean(all_entropy_traces, axis=0)
 
 # --- Plot ---
 plt.figure(figsize=(10, 6))
-plt.plot(avg_entropy, marker='o', label="Average Entropy")
+
+# Plot individual entropy traces (faint gray lines)
+for trace in all_entropy_traces:
+    plt.plot(trace, color='gray', alpha=0.1, linewidth=1)
+
+# Plot average entropy (bold line)
+plt.plot(avg_entropy, color='blue', linewidth=2.5, label="Average Entropy")
+
+end_time = time.time()
+print(f"Total runtime: {end_time - start_time:.2f} seconds")
+
+# Labels and formatting
 plt.xlabel("Move Number")
 plt.ylabel("Entropy (bits)")
-plt.title(f"Average Entropy over Time in {NUM_GAMES} Simulated Battleship Games")
+plt.title(f"Entropy Over Time in {NUM_GAMES} Simulated Battleship Games")
 plt.grid(True)
-plt.tight_layout()
 plt.legend()
+plt.tight_layout()
 plt.show()
