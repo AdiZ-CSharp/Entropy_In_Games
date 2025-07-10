@@ -1,10 +1,7 @@
-import itertools
 import math
 import matplotlib.pyplot as plt
-import matplotlib.animation as animation
 from collections import Counter
-import concurrent.futures
-import os
+import random
 
 # --- 1. Word list ---
 TARGETS = [
@@ -80,98 +77,42 @@ def expected_entropy(guess, candidates):
         ent -= p * math.log2(p)
     return ent
 
-# --- 4. Game simulation with entropy tracking ---
-def simulate_game(secret):
+# --- 4. Playable game loop ---
+def play_wordle():
+    secret = random.choice(TARGETS)
     candidates = TARGETS.copy()
-    history = []
     entropy_trace = []
+    print("Welcome to 3-Letter Wordle!")
+    # Uncomment below to debug with a known word
+    # print(f"[DEBUG] Secret word: {secret}")
+    moves = 0
     while True:
-        guess = max(candidates, key=lambda g: expected_entropy(g, candidates))
+        guess = input(f"\nEnter your guess #{moves+1} (3-letter word): ").lower().strip()
+        if len(guess) != 3 or guess not in GUESSES:
+            print("Invalid guess. Please enter a valid 3-letter word from the allowed list.")
+            continue
         fb = score_feedback(guess, secret)
+        moves += 1
+        # Print feedback in Wordle style
+        fb_str = ''.join(['🟩' if x==2 else '🟨' if x==1 else '⬜' for x in fb])
+        print(f"Feedback: {fb_str}")
         ent = expected_entropy(guess, candidates)
         entropy_trace.append(ent)
-        history.append((guess, fb))
-        if fb == (2, 2, 2):
-            return history, entropy_trace
+        if fb == (2,2,2):
+            print(f"Congratulations! You solved it in {moves} moves. The word was '{secret}'.")
+            break
+        # Filter candidates
         candidates = [w for w in candidates if score_feedback(guess, w) == fb]
-
-
-# --- 5. Simulate all games and record entropy paths (parallelized) ---
-def simulate_game_entropy(word):
-    _, entropies = simulate_game(word)
-    return entropies
+        print(f"Possible words remaining: {len(candidates)}")
+    # Plot entropy trace
+    plt.figure(figsize=(7,4))
+    plt.plot(range(1, len(entropy_trace)+1), entropy_trace, marker='o', color='blue')
+    plt.title("Entropy After Each Move (3-Letter Wordle)")
+    plt.xlabel("Move Number")
+    plt.ylabel("Expected Entropy (bits)")
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
 
 if __name__ == "__main__":
-    with concurrent.futures.ProcessPoolExecutor(max_workers=os.cpu_count()) as executor:
-        entropy_logs = list(executor.map(simulate_game_entropy, TARGETS))
-
-    # --- 6. Compute average entropy per turn ---
-    max_turns = max(len(log) for log in entropy_logs)
-    avg_entropy_by_turn = []
-    for i in range(max_turns):
-        turn_vals = [log[i] for log in entropy_logs if i < len(log)]
-        avg_entropy_by_turn.append(sum(turn_vals) / len(turn_vals))
-
-    # --- Print Top 10 starting words by expected entropy ---
-    print("Top 10 starting words by expected entropy (higher is better):")
-    start_entropies = []
-    for word in TARGETS:
-        ent = expected_entropy(word, TARGETS)
-        start_entropies.append((ent, word))
-    start_entropies.sort(reverse=True)
-    for rank, (ent, word) in enumerate(start_entropies[:10], 1):
-        print(f"{rank:2d}. {word}  ({ent:.4f} bits)")
-
-    # --- 7a. Animate average entropy drop ---
-    fig1, ax1 = plt.subplots(figsize=(8,5))
-    ax1.set_xlim(0.5, len(avg_entropy_by_turn) + 0.5)
-    ax1.set_ylim(0, max(avg_entropy_by_turn) + 0.5)
-    line, = ax1.plot([], [], marker='o', color='blue')
-    ax1.set_title("Entropy Drop While Solving 3-Letter Wordle (Average)")
-    ax1.set_xlabel("Turn")
-    ax1.set_ylabel("Expected Entropy (bits)")
-    ax1.grid(True)
-
-    xdata, ydata = [], []
-
-    lines = []
-    avg_line, = ax1.plot([], [], lw=3, color='blue', label='Average Entropy')
-
-    def init():
-        return lines + [avg_line]
-
-    def update(frame):
-        if frame < len(entropy_logs):
-            trace = entropy_logs[frame]
-            x = list(range(1, len(trace)+1))
-            y = trace
-            line, = ax1.plot(x, y, color='gray', alpha=0.2)
-            lines.append(line)
-        x_avg = list(range(1, len(avg_entropy_by_turn)+1))
-        y_avg = avg_entropy_by_turn
-        avg_line.set_data(x_avg, y_avg)
-        return lines + [avg_line]
-
-    ani = animation.FuncAnimation(
-        fig1, update, frames=len(entropy_logs),
-        init_func=init, blit=True, interval=10, repeat=False
-    )
-
-    # --- 7b. Plot all entropy traces for all games ---
-    fig2, ax2 = plt.subplots(figsize=(8,5))
-    for trace in entropy_logs:
-        ax2.plot(range(1, len(trace)+1), trace, color='gray', alpha=0.2)
-    ax2.plot(range(1, len(avg_entropy_by_turn)+1), avg_entropy_by_turn, color='blue', label='Average')
-    ax2.set_title("Entropy Traces for All Games (3-Letter Wordle)")
-    ax2.set_xlabel("Turn")
-    ax2.set_ylabel("Expected Entropy (bits)")
-    ax2.grid(True)
-    ax2.legend()
-
-    # Show both figures simultaneously
-    fig1.show()
-    fig2.show()
-    import time
-    # Give time for both windows to appear before script exits
-    plt.pause(0.1)
-    input("Press Enter to close plots...")
+    play_wordle()
